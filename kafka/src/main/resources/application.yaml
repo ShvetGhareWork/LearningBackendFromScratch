@@ -25,3 +25,7 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+jwt:
+  secret-key: 2f5400352a42dd99c2953e4e6c60ce80d7f3856d7c680d8af2d92349e8f9133d
+  expiration: 3600000 # 1 hour in milliseconds
