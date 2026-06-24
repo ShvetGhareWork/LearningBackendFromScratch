@@ -60,6 +60,10 @@ public class AuthService {
         String kafkaPayload = String.format("Login successful: %s", user.getEmail());
         kafkaTemplate.send(TOPIC, user.getEmail(), kafkaPayload);
 
+        // Welcome email kafka payload
+        String welcomeEmail = String.format("New user registered: %s", user.getEmail());
+        kafkaTemplate.send(TOPIC, user.getEmail(), welcomeEmail);
+
         // 2. Generate and return the JWT
         String jwtToken = jwtService.generateToken(user.getEmail());
         return AuthenticationResponse.builder()
