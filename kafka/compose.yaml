@@ -8,6 +8,12 @@ services:
     ports:
       - "5432:5432"
 
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
   kafka:
     image: "apache/kafka:latest"
     ports:

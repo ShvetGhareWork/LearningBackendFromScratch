@@ -1,89 +1,121 @@
-A structured implementation of a highly scalable, event-driven microservices architecture.
+# Learning Backend From Scratch: Event-Driven Microservices
 
-This repository documents the progression from foundational REST API development to a distributed systems model. It demonstrates the decoupling of domain logic (like user authentication) from asynchronous processes (like notification delivery) using an internal event bus.
+A structured implementation of a highly scalable, event-driven microservices architecture using Spring Boot, Apache Kafka, and PostgreSQL.
 
-🏗️ Architecture & Tech Stack
-This project utilizes a modern Java ecosystem and self-managed message brokers to ensure high throughput and data integrity.
+This repository documents the progression from foundational REST API development to a distributed systems model. It demonstrates the decoupling of domain logic (like user authentication and JWT validation) from asynchronous processes (like notification delivery) using an internal event bus.
 
-Core Framework: Java 17+ / Spring Boot 3.x
+---
 
-Data Persistence: PostgreSQL via Spring Data JPA / Hibernate
+## 🏗️ Architecture & Tech Stack
 
-Security: Spring Security (BCrypt Password Encoding, Stateless API design)
+This project utilizes a modern Java ecosystem and self-managed message brokers to ensure high throughput, security, and data integrity.
 
-Event Streaming: Apache Kafka (Configured in KRaft mode, eliminating ZooKeeper dependencies)
+* **Core Framework**: Java 25 / Spring Boot 3.x (utilizing parent configuration)
+* **Microservices**:
+  * **Auth Service** (Port `8080`): Handles user registration, database persistence, and stateless authentication.
+  * **Notification Service** (Port `8081`): A fully decoupled listener service that consumes events and handles email delivery.
+* **Data Persistence**: PostgreSQL via Spring Data JPA / Hibernate.
+* **Security & Authentication**: Spring Security + JWT (JSON Web Tokens) with a custom `JwtAuthenticationFilter` providing stateless token verification.
+* **Global Error Handling**: Standardized controller advices transforming system errors into clean `ApiError` responses.
+* **Event Streaming**: Apache Kafka (KRaft mode, eliminating ZooKeeper dependencies).
+* **SMTP Sandbox**: Mailpit running in Docker to capture and inspect mock welcome emails in a web-based GUI.
+* **Infrastructure**: Docker & Docker Compose.
+* **Boilerplate Reduction**: Lombok.
 
-Infrastructure: Docker & Docker Compose (via Spring Boot Docker Compose integration)
+---
 
-Boilerplate Reduction: Lombok
+## ⚙️ System Components & Flow
 
-⚙️ System Components
-Currently, the system comprises the following logical layers:
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as Auth Service (8080)
+    participant Kafka as Kafka Broker (9092)
+    participant Notification as Notification Service (8081)
+    participant Mailpit as Mailpit (1025)
 
-Auth Service: Handles user registration and authentication. Persists user state securely to PostgreSQL.
+    Client->>Auth: POST /api/auth/signup (User info)
+    Note over Auth: 1. Hash password & Save to DB
+    Auth-->>Kafka: 2. Emit JSON Event (auth-topic)
+    Auth->>Client: 3. Return JWT Token (Immediate response)
+    
+    Note over Notification: 4. Listen on auth-topic
+    Kafka-->>Notification: 5. Consumer receives JSON Event
+    Note over Notification: 6. Build HTML Welcome Email
+    Notification->>Mailpit: 7. Send SMTP Mail
+```
 
-Event Publisher: A Kafka Producer integrated within the transactional boundaries of the Auth Service. Emits highly structured JSON payloads (e.g., SIGNUP_SUCCESS) to specific topics upon successful state changes.
+---
 
-Notification Consumer (WIP): A decoupled service that listens to the registration topics to handle external API integrations (e.g., triggering email delivery) without blocking the primary request thread.
+## 🚀 Local Development Setup
 
-🚀 Local Development Setup
-Prerequisites
-JDK 17 or higher
+### Prerequisites
+* JDK 25 or higher
+* Maven 3.8+
+* Docker Desktop / Docker Engine
 
-Maven 3.8+
+### 1. Infrastructure Provisioning
+Spin up PostgreSQL, Apache Kafka, and Mailpit using Docker Compose:
+```bash
+docker compose up -d
+```
+Access the mock email inbox in your browser at `http://localhost:8025`.
 
-Docker Desktop / Docker Engine (Required for local infrastructure)
+### 2. Running the Microservices
+1. **Start the Auth Service**:
+   ```bash
+   cd kafka
+   mvn clean spring-boot:run
+   ```
+2. **Start the Notification Service**:
+   ```bash
+   cd ../notification-service
+   mvn clean spring-boot:run
+   ```
 
-1. Infrastructure Provisioning
-The project relies on Spring Boot's native Docker Compose support. Upon application startup, Spring Boot will automatically pull and provision the necessary PostgreSQL and Kafka (KRaft) containers defined in the compose.yml.
+---
 
-2. Configuration
-Ensure your application.properties or application.yml is configured for the local environment.
+## 🧪 Testing the Flows
 
-Properties
-# Database Configuration
-spring.datasource.url=jdbc:postgresql://localhost:5432/backend_db
-spring.datasource.username=postgres
-spring.datasource.password=your_secure_password
-spring.jpa.hibernate.ddl-auto=update
-
-# Kafka Configuration
-spring.kafka.bootstrap-servers=localhost:9092
-spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
-spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer
-spring.kafka.producer.acks=all
-3. Execution
-Compile and boot the application via Maven:
-
-Bash
-mvn clean install
-mvn spring-boot:run
-🧪 Testing the API
-You can verify the event-driven registration flow using the following cURL command (or via Postman/Insomnia):
-
-Bash
+### 1. User Registration (Signup)
+Create a new user. The system will persist the user, publish a Kafka event, and return a JWT token.
+```bash
 curl -X POST http://localhost:8080/api/auth/signup \
      -H "Content-Type: application/json" \
      -d '{
-           "name": "Alice Smith",
-           "email": "alice.smith@example.com",
+           "name": "Jane Doe",
+           "email": "jane.doe@example.com",
            "password": "securepassword123"
          }'
-To verify the Kafka integration, monitor your broker logs or attach a CLI consumer to the user-registration-events topic to observe the emitted JSON payloads.
+```
+*Check `http://localhost:8025` to see the welcome email in Mailpit!*
 
-🗺️ Roadmap / Backlog
-[x] Establish base Spring Boot project and JPA configurations.
+### 2. User Authentication (Login)
+Retrieve a stateless JWT bearer token:
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{
+           "email": "jane.doe@example.com",
+           "password": "securepassword123"
+         }'
+```
 
-[x] Implement secure User entity mapping and PostgreSQL integration.
+### 3. Accessing Protected Endpoints
+To access endpoints under `/api/users/**`, include the bearer token returned from login/signup in the headers:
+```bash
+curl -X GET http://localhost:8080/api/users/all \
+     -H "Authorization: Bearer <PASTE_YOUR_JWT_HERE>"
+```
 
-[x] Configure Auth Controller and BCrypt password hashing.
+---
 
-[x] Provision Kafka KRaft cluster via Docker Compose.
-
-[x] Implement Kafka Producer for asynchronous registration events.
-
-[ ] Implement Kafka Consumer for email delivery integration.
-
-[ ] Transition to JWT-based stateless session management.
-
-[ ] Introduce global exception handling and standardized API error responses.
+## 🗺️ Roadmap / Backlog
+* [x] Establish base Spring Boot project and JPA configurations.
+* [x] Implement secure User entity mapping and PostgreSQL integration.
+* [x] Configure Auth Controller and BCrypt password hashing.
+* [x] Provision Kafka KRaft cluster via Docker Compose.
+* [x] Implement Kafka Producer for asynchronous registration events.
+* [x] Implement Kafka Consumer for email delivery integration.
+* [x] Transition to JWT-based stateless session management.
+* [x] Introduce global exception handling and standardized API error responses.

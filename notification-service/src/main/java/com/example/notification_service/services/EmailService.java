@@ -1,4 +1,4 @@
-package com.example.kafka.services;
+package com.example.notification_service.services;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -13,15 +13,14 @@ public class EmailService {
 
     private final JavaMailSender javaMailSender;
 
-    public void sendWelcomeEmail(String toEmail) {
+    public void sendWelcomeEmail(String toEmail, String username) {
         try {
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            // Enable HTML and UTF-8 encoding
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
             
             helper.setTo(toEmail);
             helper.setSubject("Welcome to Our Platform! 🚀");
-            helper.setText(getHtmlContent(toEmail), true); // 'true' flags that this content is HTML
+            helper.setText(getHtmlContent(username), true);
 
             javaMailSender.send(mimeMessage);
             System.out.println("HTML Email sent successfully to " + toEmail);
@@ -31,10 +30,7 @@ public class EmailService {
         }
     }
 
-    private String getHtmlContent(String emailAddress) {
-        // Extract the username/handle from email to personalize it
-        String username = emailAddress.split("@")[0];
-        
+    private String getHtmlContent(String username) {
         return "<!DOCTYPE html>" +
                "<html>" +
                "<head>" +

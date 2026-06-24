@@ -6,8 +6,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.kafka.dto.AuthenticationResponse;
+import com.example.kafka.dto.UserRegisteredEvent;
 import com.example.kafka.model.User;
 import com.example.kafka.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,6 +21,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final JwtService jwtService;
+    private final ObjectMapper objectMapper;
 
     private static final String TOPIC = "auth-topic";
 
@@ -37,9 +40,17 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
 
-        // 2. Kafka Payload Setup
-        String kafkaPayload = String.format("New user registered: %s", user.getEmail()); // camelCase
-        kafkaTemplate.send(TOPIC, user.getEmail(), kafkaPayload);
+        // 2. Kafka Payload Setup (JSON Event)
+        try {
+            UserRegisteredEvent event = UserRegisteredEvent.builder()
+                    .email(user.getEmail())
+                    .username(user.getName())
+                    .build();
+            String kafkaPayload = objectMapper.writeValueAsString(event);
+            kafkaTemplate.send(TOPIC, user.getEmail(), kafkaPayload);
+        } catch (Exception e) {
+            System.err.println("Failed to publish Kafka user-registered event: " + e.getMessage());
+        }
 
         // 3. Generate and return JWT.
         String jwtToken = jwtService.generateToken(user.getEmail());
